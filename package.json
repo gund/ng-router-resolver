@@ -1,0 +1,29 @@
+{
+  "name": "ng-router-resolver",
+  "version": "0.0.1",
+  "description": "Resolve routes from Angular Module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "anguar",
+    "angular2",
+    "angular4",
+    "ng",
+    "router",
+    "resolve",
+    "cli"
+  ],
+  "author": "Alex Malkevich <malkevich.alex@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@angular/core": "^4.2.2",
+    "@angular/router": "^4.2.2",
+    "typescript": "^2.3.4"
+  },
+  "devDependencies": {
+    "@types/core-js": "^0.9.41",
+    "@types/node": "^7.0.31"
+  }
+}

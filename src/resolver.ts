@@ -12,7 +12,7 @@ main()
   });
 
 async function main() {
-  const fileName = __dirname + '/../src/app/app.module.ts';
+  const fileName = __dirname + '/test.module.ts';
   const program = ts.createProgram([fileName], { module: ts.ModuleKind.ES2015 });
   const diagnostics = program.getGlobalDiagnostics();
   const checker = program.getTypeChecker();
@@ -32,7 +32,7 @@ async function main() {
   }
 
   const isDecoratorNgModule = isDecoratorOfType('NgModule');
-  const ngModules = classes.filter(e => e.decorators.some(isDecoratorNgModule));
+  const ngModules = classes.filter(e => e.decorators && e.decorators.some(isDecoratorNgModule));
 
   if (ngModules.length === 0) {
     throw Error('No exported NgModule class found');
@@ -42,7 +42,14 @@ async function main() {
     throw Error('More than 1 NgModule exported found');
   }
 
-  const ngModule = getNgModuleFromDecorator(ngModules.shift().decorators.shift());
+  const ngModuleStmt = ngModules[0];
+  const ngModuleDecorators = ngModuleStmt.decorators && ngModuleStmt.decorators[0];
+
+  if (!ngModuleDecorators) {
+    throw Error('No decorators found in NgModule');
+  }
+
+  const ngModule = getNgModuleFromDecorator(ngModuleDecorators);
 
   if (!ngModule.imports) {
     console.log('No imports found in NgModule');
@@ -101,7 +108,11 @@ function getNgModuleFromDecorator(decorator: ts.Decorator): {[P in keyof NgModul
     throw Error('No arguments were passed to @NgModule decorator');
   }
 
-  const arg = node.arguments.shift();
+  const arg = node.arguments[0];
+
+  if (!arg) {
+    throw Error('No arguments passed to NgModule decorator');
+  }
 
   if (arg.kind === ts.SyntaxKind.ObjectLiteralExpression) {
     return getNgModuleFromObjectLiteral(arg as ts.ObjectLiteralExpression);
@@ -118,7 +129,7 @@ function getNgModuleFromObjectLiteral(obj: ts.ObjectLiteralExpression): {[P in k
     throw Error('No properties found in @NgModule object. Only property assignments supported');
   }
 
-  const ngModule = {};
+  const ngModule: { [k: string]: ts.Expression } = {};
 
   propAssignmets.forEach(prop => ngModule[prop.name.getText()] = prop.initializer);
 
@@ -137,8 +148,13 @@ function extractExpressionChildren(expr: ts.Expression): ts.Node[] {
 
 function resolveSpreadExpr(spreadElem: ts.SpreadElement, checker: ts.TypeChecker, program: ts.Program): ts.Node[] {
   const symbol = checker.getSymbolAtLocation(spreadElem.expression);
+
+  if (!symbol || !symbol.declarations) {
+    throw Error('Failed to get symbol declarations of import identifier');
+  }
+
   const importSpecifier = symbol.declarations[0] as ts.ImportSpecifier;
-  const identifiers = importSpecifier.getSourceFile()['identifiers'] as Map<string, string>;
+  const identifiers = (<any>importSpecifier.getSourceFile())['identifiers'] as Map<string, string>;
 
   let found = false, path = '';
   identifiers.forEach(key => {
