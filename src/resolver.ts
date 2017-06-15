@@ -1,11 +1,17 @@
 import { NgModule } from '@angular/core';
+import { Route } from '@angular/router';
 import * as ts from 'typescript';
 
-const startTime = Date.now();
+const ROUTES_EXPRS_TXT = ['RouterModule.forRoot', 'RouterModule.forChild'];
+
 const isNodeClassDeclaration = isNodeOfKind(ts.SyntaxKind.ClassDeclaration);
 const isNodeSpreadElement = isNodeOfKind(ts.SyntaxKind.SpreadElement);
 const isNodeIdentifier = isNodeOfKind(ts.SyntaxKind.Identifier);
 const isNodePropertyAssignment = isNodeOfKind(ts.SyntaxKind.PropertyAssignment);
+const isNodeCallExpression = isNodeOfKind(ts.SyntaxKind.CallExpression);
+const isNodeObjectLiteralExpression = isNodeOfKind(ts.SyntaxKind.ObjectLiteralExpression);
+
+const startTime = Date.now();
 
 main()
   .then(() => Date.now())
@@ -18,13 +24,13 @@ main()
 async function main() {
   const fileName = __dirname + '/../test/test.module.ts';
   const program = ts.createProgram([fileName], { module: ts.ModuleKind.ES2015 });
-  const diagnostics = program.getGlobalDiagnostics();
   const checker = program.getTypeChecker();
+  const diagnostics = program.getGlobalDiagnostics();
   const sourceFile = program.getSourceFile(fileName);
   const statements = sourceFile.statements;
 
   if (diagnostics.length) {
-    program.getGlobalDiagnostics().forEach(e => console.log(String(e)));
+    diagnostics.forEach(e => console.log(String(e)));
     throw Error('Errors in TS program');
   }
 
@@ -66,22 +72,32 @@ async function main() {
     return;
   }
 
-  imports.forEach(i => console.log(ts.SyntaxKind[i.kind]));
+  // const spreadImports = imports.filter(isNodeSpreadElement)
+  //   .reduce<ts.Node[]>((arr, i) => [...arr, ...resolveSpreadExpr(i as ts.SpreadElement, checker, program)], []);
+  const spreadImports: ts.Node[] = [];
 
-  const spreadImports = imports.filter(isNodeSpreadElement)
-    .reduce<ts.Node[]>((arr, i) => [...arr, ...resolveSpreadExpr(i as ts.SpreadElement, checker, program)], []);
+  imports = [...imports, ...spreadImports].filter(n => /*isNodeIdentifier(n) || */isNodeCallExpression(n));
 
-  imports = [...imports, ...spreadImports].filter(isNodeIdentifier);
+  // Resolve here all Identifiers to it's root declarations
+  const callExprs = imports as ts.CallExpression[];
 
-  if (imports.length === 0) {
-    console.log('No imports are found in NgModule. Only identifiers are supported (no spread operators yet)');
+  if (callExprs.length === 0) {
+    console.log(`No calls are found in NgModule. Routes are always calls like '${ROUTES_EXPRS_TXT[0]}(...)'`);
     return;
   }
 
-  imports.forEach(i => {
-    console.log('kind: ' + ts.SyntaxKind[i.kind]);
-    console.log('text: ' + i.getText());
-  });
+  const routerCalls = callExprs.filter(isRouterExpression);
+
+  if (routerCalls.length === 0) {
+    throw Error('No routes found in NgModule');
+  }
+
+  if (routerCalls.length > 1) {
+    throw Error('More than 1 imports of routes found. Consider merging all routes in one RouterModule import');
+  }
+
+  const routes = resolveRoutesFromCall(routerCalls[0]);
+  console.log('Routes', routes);
 }
 
 function isNodeExported(node: ts.Node) {
@@ -89,7 +105,7 @@ function isNodeExported(node: ts.Node) {
 }
 
 function isNodeOfKind(kind: ts.SyntaxKind) {
-  return (node: ts.Node) => node.kind === kind;
+  return (node: ts.Node) => node && node.kind === kind;
 }
 
 function isDecoratorOfType(type: string) {
@@ -98,9 +114,9 @@ function isDecoratorOfType(type: string) {
     const node = decorator.getChildAt(1) as ts.CallExpression;
 
     return decorator.kind === ts.SyntaxKind.Decorator &&
-      (decorator.expression.kind === ts.SyntaxKind.CallExpression) &&
+      isNodeCallExpression(decorator.expression) &&
       (atToken && atToken.kind === ts.SyntaxKind.AtToken) &&
-      (node && node.kind === ts.SyntaxKind.CallExpression) &&
+      (isNodeCallExpression(node)) &&
       (node.expression.getText() === type);
   };
 }
@@ -140,10 +156,8 @@ function getNgModuleFromObjectLiteral(obj: ts.ObjectLiteralExpression): {[P in k
 }
 
 function extractExpressionChildren(expr: ts.Expression): ts.Node[] {
-  const node = expr.getChildAt(1);
-
-  if (node.kind === ts.SyntaxKind.SyntaxList) {
-    return node.getChildren();
+  if (expr.kind === ts.SyntaxKind.ArrayLiteralExpression) {
+    return (<ts.ArrayLiteralExpression>expr).elements;
   }
 
   return [];
@@ -174,4 +188,59 @@ function resolveSpreadExpr(spreadElem: ts.SpreadElement, checker: ts.TypeChecker
   console.log(file);
 
   return [];
+}
+
+function isRouterExpression(expr: ts.CallExpression): boolean {
+  if (expr.expression.kind === ts.SyntaxKind.PropertyAccessExpression) {
+    const propAccess = expr.expression as ts.PropertyAccessExpression;
+
+    if (propAccess.expression.getText() === 'RouterModule' &&
+      (propAccess.name.getText() === 'forRoot' || propAccess.name.getText() === 'forChild')) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function resolveRoutesFromCall(call: ts.CallExpression): Route[] {
+  if (call.arguments.length === 0) {
+    throw Error(`No configuration was provided to '${call.expression.getText()}'`);
+  }
+
+  const config = call.arguments[0] as ts.ArrayLiteralExpression;
+
+  if (config.kind !== ts.SyntaxKind.ArrayLiteralExpression) {
+    throw Error('Only array literals supported in router config');
+  }
+
+  const confObjects = config.elements.filter(isNodeObjectLiteralExpression) as ts.ObjectLiteralExpression[];
+
+  if (confObjects.length === 0) {
+    throw Error('No routes found in NgModule. Only object literals are supported');
+  }
+
+  const routes: Route[] = [];
+
+  confObjects.forEach(conf => {
+    const route: any = {};
+
+    conf.properties
+      .filter(isNodePropertyAssignment)
+      .forEach((p: ts.PropertyAssignment) => {
+        route[p.name.getText()] = getAsString(p.initializer);
+      });
+
+    routes.push(route);
+  });
+
+  return routes;
+}
+
+function getAsString(node: ts.Node) {
+  return node.kind === ts.SyntaxKind.StringLiteral ? node.getText().replace(/'|"/g, '') : node.getText();
+}
+
+function getIdentifierValue(node: ts.Identifier): ts.Node | undefined {
+  return undefined;
 }
