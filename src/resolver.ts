@@ -12,7 +12,7 @@ main()
   });
 
 async function main() {
-  const fileName = __dirname + '/test.module.ts';
+  const fileName = __dirname + '/../test/test.module.ts';
   const program = ts.createProgram([fileName], { module: ts.ModuleKind.ES2015 });
   const diagnostics = program.getGlobalDiagnostics();
   const checker = program.getTypeChecker();
