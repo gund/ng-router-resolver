@@ -4,6 +4,13 @@
   "description": "Resolve routes from Angular Module",
   "main": "index.js",
   "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc -w",
+    "prestart": "npm run build",
+    "start": "node dist/resolver.js",
+    "start:watch": "nodemon dist/resolver.js",
+    "prewatch": "npm run build",
+    "watch": "npm-run-all -p build:watch start:watch",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -24,6 +31,9 @@
   },
   "devDependencies": {
     "@types/core-js": "^0.9.41",
-    "@types/node": "^7.0.31"
+    "@types/node": "^7.0.31",
+    "nodemon": "^1.11.0",
+    "npm-run-all": "^4.0.2",
+    "rxjs": "^6.0.0-alpha.0"
   }
 }
