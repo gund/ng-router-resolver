@@ -80,7 +80,6 @@ async function main() {
 }
 
 function isNodeExported(node: ts.Node) {
-  // tslint:disable-next-line:no-bitwise
   return (node.flags & ts.NodeFlags.ExportContext) !== 0 || (node.parent && node.parent.kind === ts.SyntaxKind.SourceFile);
 }
 
