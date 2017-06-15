@@ -2,6 +2,10 @@ import { NgModule } from '@angular/core';
 import * as ts from 'typescript';
 
 const startTime = Date.now();
+const isNodeClassDeclaration = isNodeOfKind(ts.SyntaxKind.ClassDeclaration);
+const isNodeSpreadElement = isNodeOfKind(ts.SyntaxKind.SpreadElement);
+const isNodeIdentifier = isNodeOfKind(ts.SyntaxKind.Identifier);
+const isNodePropertyAssignment = isNodeOfKind(ts.SyntaxKind.PropertyAssignment);
 
 main()
   .then(() => Date.now())
@@ -24,7 +28,6 @@ async function main() {
     throw Error('Errors in TS program');
   }
 
-  const isNodeClassDeclaration = isNodeOfKind(ts.SyntaxKind.ClassDeclaration);
   const classes = statements.filter(n => isNodeClassDeclaration(n) && isNodeExported(n));
 
   if (classes.length === 0) {
@@ -63,10 +66,12 @@ async function main() {
     return;
   }
 
-  const spreadImports = imports.filter(isNodeOfKind(ts.SyntaxKind.SpreadElement))
+  imports.forEach(i => console.log(ts.SyntaxKind[i.kind]));
+
+  const spreadImports = imports.filter(isNodeSpreadElement)
     .reduce<ts.Node[]>((arr, i) => [...arr, ...resolveSpreadExpr(i as ts.SpreadElement, checker, program)], []);
 
-  imports = [...imports, ...spreadImports].filter(isNodeOfKind(ts.SyntaxKind.Identifier));
+  imports = [...imports, ...spreadImports].filter(isNodeIdentifier);
 
   if (imports.length === 0) {
     console.log('No imports are found in NgModule. Only identifiers are supported (no spread operators yet)');
@@ -121,7 +126,6 @@ function getNgModuleFromDecorator(decorator: ts.Decorator): {[P in keyof NgModul
 }
 
 function getNgModuleFromObjectLiteral(obj: ts.ObjectLiteralExpression): {[P in keyof NgModule]: ts.Expression} {
-  const isNodePropertyAssignment = isNodeOfKind(ts.SyntaxKind.PropertyAssignment);
   const propAssignmets = obj.properties.filter(isNodePropertyAssignment) as ts.PropertyAssignment[];
 
   if (propAssignmets.length === 0) {
