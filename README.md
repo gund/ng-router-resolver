@@ -25,6 +25,7 @@ The limitation is that it cannot yet resolve routes from variables only from lit
 - Support Identifiers in routes configuration (currently only object literals are supported)
 - Support Spread operators in routes configuration
 - Organize internal code structure to transition from POC to some stable version
+- Create a CLI for resolving routes and dumping them as JSON structure into file
 
 ## License
 
