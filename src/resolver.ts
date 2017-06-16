@@ -23,6 +23,10 @@ main()
 
 async function main() {
   const fileName = __dirname + '/../test/test.module.ts';
+  getRoutesFromFile(fileName).forEach(r => console.log(r));
+}
+
+function getRoutesFromFile(fileName: string): Route[] {
   const program = ts.createProgram([fileName], { module: ts.ModuleKind.ES2015 });
   const checker = program.getTypeChecker();
   const diagnostics = program.getGlobalDiagnostics();
@@ -62,14 +66,14 @@ async function main() {
 
   if (!ngModule.imports) {
     console.log('No imports found in NgModule');
-    return;
+    return [];
   }
 
   let imports = extractExpressionChildren(ngModule.imports);
 
   if (imports.length === 0) {
     console.log('No imports are found in NgModule. Only array literals are supported in NgModule.import');
-    return;
+    return [];
   }
 
   // const spreadImports = imports.filter(isNodeSpreadElement)
@@ -83,7 +87,7 @@ async function main() {
 
   if (callExprs.length === 0) {
     console.log(`No calls are found in NgModule. Routes are always calls like '${ROUTES_EXPRS_TXT[0]}(...)'`);
-    return;
+    return [];
   }
 
   const routerCalls = callExprs.filter(isRouterExpression);
@@ -97,7 +101,10 @@ async function main() {
   }
 
   const routes = resolveRoutesFromCall(routerCalls[0]);
-  console.log('Routes', routes);
+
+  // Resolve lazy routes here
+
+  return routes;
 }
 
 function isNodeExported(node: ts.Node) {
@@ -214,7 +221,11 @@ function resolveRoutesFromCall(call: ts.CallExpression): Route[] {
     throw Error('Only array literals supported in router config');
   }
 
-  const confObjects = config.elements.filter(isNodeObjectLiteralExpression) as ts.ObjectLiteralExpression[];
+  return getRoutesFromArray(config);
+}
+
+function getRoutesFromArray(array: ts.ArrayLiteralExpression): Route[] {
+  const confObjects = array.elements.filter(isNodeObjectLiteralExpression) as ts.ObjectLiteralExpression[];
 
   if (confObjects.length === 0) {
     throw Error('No routes found in NgModule. Only object literals are supported');
@@ -228,13 +239,22 @@ function resolveRoutesFromCall(call: ts.CallExpression): Route[] {
     conf.properties
       .filter(isNodePropertyAssignment)
       .forEach((p: ts.PropertyAssignment) => {
-        route[p.name.getText()] = getAsString(p.initializer);
+        route[p.name.getText()] = getRouteValue(p.initializer);
       });
 
     routes.push(route);
   });
 
   return routes;
+}
+
+function getRouteValue(expr: ts.Node): any {
+  // Resolve child routes
+  if (expr.kind === ts.SyntaxKind.ArrayLiteralExpression) {
+    return getRoutesFromArray(expr as ts.ArrayLiteralExpression);
+  }
+
+  return getAsString(expr);
 }
 
 function getAsString(node: ts.Node) {
