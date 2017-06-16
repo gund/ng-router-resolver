@@ -1,6 +1,7 @@
 import { NgModule } from '@angular/core';
 import { Route } from '@angular/router';
 import * as ts from 'typescript';
+import { dirname, join } from 'path';
 
 const ROUTES_EXPRS_TXT = ['RouterModule.forRoot', 'RouterModule.forChild'];
 
@@ -26,7 +27,7 @@ async function main() {
   getRoutesFromFile(fileName).forEach(r => console.log(r));
 }
 
-function getRoutesFromFile(fileName: string): Route[] {
+function getRoutesFromFile(fileName: string, moduleName?: string): Route[] {
   const program = ts.createProgram([fileName], { module: ts.ModuleKind.ES2015 });
   const checker = program.getTypeChecker();
   const diagnostics = program.getGlobalDiagnostics();
@@ -38,7 +39,7 @@ function getRoutesFromFile(fileName: string): Route[] {
     throw Error('Errors in TS program');
   }
 
-  const classes = statements.filter(n => isNodeClassDeclaration(n) && isNodeExported(n));
+  const classes = statements.filter(n => isNodeClassDeclaration(n) && isNodeExported(n)) as ts.ClassDeclaration[];
 
   if (classes.length === 0) {
     throw Error('No exported classes found');
@@ -55,8 +56,16 @@ function getRoutesFromFile(fileName: string): Route[] {
     throw Error('More than 1 NgModule exported found');
   }
 
-  const ngModuleStmt = ngModules[0];
-  const ngModuleDecorators = ngModuleStmt.decorators && ngModuleStmt.decorators[0];
+  const ngModuleClass = ngModules[0];
+
+  // Check if NgModule is same as expected by moduleName
+  if (moduleName) {
+    if (!ngModuleClass.name || ngModuleClass.name.getText() !== moduleName) {
+      throw Error(`NgModule with name '${moduleName}' was expected in ${fileName}`);
+    }
+  }
+
+  const ngModuleDecorators = ngModuleClass.decorators && ngModuleClass.decorators[0];
 
   if (!ngModuleDecorators) {
     throw Error('No decorators found in NgModule');
@@ -100,7 +109,7 @@ function getRoutesFromFile(fileName: string): Route[] {
     throw Error('More than 1 imports of routes found. Consider merging all routes in one RouterModule import');
   }
 
-  const routes = resolveRoutesFromCall(routerCalls[0]);
+  const routes = resolveRoutesFromCall(routerCalls[0], fileName);
 
   // Resolve lazy routes here
 
@@ -210,7 +219,7 @@ function isRouterExpression(expr: ts.CallExpression): boolean {
   return false;
 }
 
-function resolveRoutesFromCall(call: ts.CallExpression): Route[] {
+function resolveRoutesFromCall(call: ts.CallExpression, currentFile: string): Route[] {
   if (call.arguments.length === 0) {
     throw Error(`No configuration was provided to '${call.expression.getText()}'`);
   }
@@ -221,10 +230,10 @@ function resolveRoutesFromCall(call: ts.CallExpression): Route[] {
     throw Error('Only array literals supported in router config');
   }
 
-  return getRoutesFromArray(config);
+  return getRoutesFromArray(config, currentFile);
 }
 
-function getRoutesFromArray(array: ts.ArrayLiteralExpression): Route[] {
+function getRoutesFromArray(array: ts.ArrayLiteralExpression, currentFile: string): Route[] {
   const confObjects = array.elements.filter(isNodeObjectLiteralExpression) as ts.ObjectLiteralExpression[];
 
   if (confObjects.length === 0) {
@@ -239,7 +248,8 @@ function getRoutesFromArray(array: ts.ArrayLiteralExpression): Route[] {
     conf.properties
       .filter(isNodePropertyAssignment)
       .forEach((p: ts.PropertyAssignment) => {
-        route[p.name.getText()] = getRouteValue(p.initializer);
+        const name = p.name.getText();
+        route[name] = getRouteValue(name, p.initializer, currentFile);
       });
 
     routes.push(route);
@@ -248,17 +258,40 @@ function getRoutesFromArray(array: ts.ArrayLiteralExpression): Route[] {
   return routes;
 }
 
-function getRouteValue(expr: ts.Node): any {
-  // Resolve child routes
-  if (expr.kind === ts.SyntaxKind.ArrayLiteralExpression) {
-    return getRoutesFromArray(expr as ts.ArrayLiteralExpression);
+function getRouteValue(name: string, expr: ts.Node, currentFile: string): any {
+  switch (name) {
+    case 'children': {
+      if (expr.kind !== ts.SyntaxKind.ArrayLiteralExpression) {
+        throw Error('Only array literals are supported for child routes');
+      }
+      return getRoutesFromArray(expr as ts.ArrayLiteralExpression, currentFile);
+    }
+    case 'loadChildren': {
+      const { path, moduleName } = getLazyInfoFromStr(getAsString(expr));
+      const lazyFile = join(dirname(currentFile), path);
+      return getRoutesFromFile(lazyFile, moduleName);
+    }
+    default:
+      return getAsString(expr);
   }
-
-  return getAsString(expr);
 }
 
 function getAsString(node: ts.Node) {
   return node.kind === ts.SyntaxKind.StringLiteral ? node.getText().replace(/'|"/g, '') : node.getText();
+}
+
+function getLazyInfoFromStr(str: string) {
+  let [path, moduleName] = str.split('#');
+
+  if (!path || !moduleName) {
+    throw Error(`Invalid lazy-load string '${str}'`);
+  }
+
+  if (!path.endsWith('.ts')) {
+    path += '.ts';
+  }
+
+  return { path, moduleName };
 }
 
 function getIdentifierValue(node: ts.Identifier): ts.Node | undefined {
