@@ -14,12 +14,14 @@ to add some offline/cache capabilities to any Angular application.
 
 Currently it is in POC stage.
 
-It parses given Angular TS module and collects top level routes.
+It parses given Angular TS module and collects all routes.
+
+The limitation is that it cannot yet resolve routes from variables only from literals.
 
 ## Next Steps
 
 - ~~Collect children routes~~ [DONE]
-- Collect lazy routes from other modules
+- ~~Collect lazy routes from other modules~~ [DONE]
 - Support Identifiers in routes configuration (currently only object literals are supported)
 - Support Spread operators in routes configuration
 - Organize internal code structure to transition from POC to some stable version
