@@ -18,7 +18,7 @@ It parses given Angular TS module and collects top level routes.
 
 ## Next Steps
 
-- Collect children routes
+- ~~Collect children routes~~ [DONE]
 - Collect lazy routes from other modules
 - Support Identifiers in routes configuration (currently only object literals are supported)
 - Support Spread operators in routes configuration
