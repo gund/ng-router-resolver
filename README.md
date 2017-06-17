@@ -22,8 +22,9 @@ The limitation is that it cannot yet resolve routes from variables only from lit
 
 - ~~Collect children routes~~ [DONE]
 - ~~Collect lazy routes from other modules~~ [DONE]
-- Support Identifiers in routes configuration (currently only object literals are supported)
-- Support Spread operators in routes configuration
+- ~~Support Identifiers in routes configuration~~ [DONE]
+- ~~Support Spread operators in routes configuration~~ [DONE]
+- Collect routes from other impoted modules
 - Organize internal code structure to transition from POC to some stable version
 - Create a CLI for resolving routes and dumping them as JSON structure into file
 
