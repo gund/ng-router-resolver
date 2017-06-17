@@ -16,7 +16,9 @@
     "start:watch": "nodemon dist/test/test.js",
     "prewatch": "npm run build:test",
     "watch": "npm-run-all -p build:test:watch start:watch",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare-package": "node scripts/build.js",
+    "release": "npm-run-all -s build prepare-package"
   },
   "repository": {
     "type": "git",
