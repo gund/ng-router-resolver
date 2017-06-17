@@ -2,8 +2,12 @@ import { Routes, RouterModule } from '@angular/router';
 import { NgModule } from '@angular/core';
 
 const routes: Routes = [
-  { path: 'path1', component: undefined },
-  { path: 'path2', component: undefined },
+  {
+    path: '', component: undefined, pathMatch: 'full', children: [
+      { path: 'child', component: undefined }
+    ]
+  },
+  { path: 'lazy', loadChildren: './lazy.module#LazyModule' },
 ];
 
 @NgModule({

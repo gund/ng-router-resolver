@@ -65,35 +65,7 @@ function getRoutesFromFile(fileName: string, moduleName?: string): Route[] {
     }
   }
 
-  const ngModuleDecorators = ngModuleClass.decorators && ngModuleClass.decorators[0];
-
-  if (!ngModuleDecorators) {
-    throw Error('No decorators found in NgModule');
-  }
-
-  const ngModule = getNgModuleFromDecorator(ngModuleDecorators);
-
-  if (!ngModule.imports) {
-    console.log('No imports found in NgModule');
-    return [];
-  }
-
-  let imports = resolveAsIdentifier(extractExpressionChildren, ngModule.imports, checker);
-
-  if (imports.length === 0) {
-    console.log('No imports are found in NgModule. Only array literals are supported in NgModule.import');
-    return [];
-  }
-
-  // Resolve here all Identifiers to it's root declarations
-  const callExprs = imports
-    .map(n => {
-      if (n.kind === ts.SyntaxKind.Identifier) {
-        return resolveImportIdentifier(n as ts.Identifier, checker);
-      }
-      return n;
-    })
-    .filter(isNodeCallExpression) as ts.CallExpression[];
+  const callExprs = getRouteCallsFromClass(ngModuleClass, checker);
 
   if (callExprs.length === 0) {
     console.log(`No calls are found in NgModule. Routes are always calls like '${ROUTES_EXPRS_TXT[0]}(...)'`);
@@ -136,6 +108,38 @@ function isDecoratorOfType(type: string) {
   };
 }
 
+function getRouteCallsFromClass(cls: ts.ClassDeclaration, checker: ts.TypeChecker): ts.CallExpression[] {
+  const ngModuleDecorators = cls.decorators && cls.decorators[0];
+
+  if (!ngModuleDecorators || !isDecoratorOfType('NgModule')(ngModuleDecorators)) {
+    throw Error('No decorators found in NgModule');
+  }
+
+  const ngModule = getNgModuleFromDecorator(ngModuleDecorators);
+
+  if (!ngModule.imports) {
+    console.log('No imports found in NgModule');
+    return [];
+  }
+
+  let imports = resolveAsIdentifier(extractExpressionChildren, ngModule.imports, checker);
+
+  if (imports.length === 0) {
+    console.log('No imports are found in NgModule');
+    return [];
+  }
+
+  // Resolve here all Identifiers to it's root declarations
+  return imports
+    .reduce((arr, n) => {
+      if (n.kind === ts.SyntaxKind.Identifier) {
+        return [...arr, ...resolveImportIdentifier(n as ts.Identifier, checker)];
+      }
+      return [...arr, n];
+    }, <ts.Node[]>[])
+    .filter(isNodeCallExpression) as ts.CallExpression[];
+}
+
 function getNgModuleFromDecorator(decorator: ts.Decorator): {[P in keyof NgModule]: ts.Expression} {
   const node = decorator.getChildAt(1) as ts.CallExpression;
 
@@ -156,15 +160,29 @@ function getNgModuleFromDecorator(decorator: ts.Decorator): {[P in keyof NgModul
   throw Error('Only object literals supported in @NgModule for now');
 }
 
-function resolveImportIdentifier(identifier: ts.Identifier, checker: ts.TypeChecker): ts.Node {
-  const symbol = checker.getSymbolAtLocation(identifier);
-  const decl = symbol.valueDeclaration;
+function resolveImportIdentifier(identifier: ts.Identifier, checker: ts.TypeChecker): ts.Node[] {
+  function resolveSymbol(symbol: ts.Symbol): ts.Node[] {
+    const valDeclaration = symbol.valueDeclaration;
+    const declarations = symbol.declarations;
 
-  if (decl && decl.kind === ts.SyntaxKind.VariableDeclaration) {
-    return getVariableValue(decl as ts.VariableDeclaration);
+    if (valDeclaration) {
+      if (valDeclaration.kind === ts.SyntaxKind.VariableDeclaration) {
+        return [getVariableValue(valDeclaration as ts.VariableDeclaration)];
+      }
+      if (valDeclaration.kind === ts.SyntaxKind.ClassDeclaration) {
+        return getRouteCallsFromClass(valDeclaration as ts.ClassDeclaration, checker);
+      }
+    }
+    if (declarations) {
+      return declarations
+        .reduce((arr, d) => d.kind === ts.SyntaxKind.ImportSpecifier
+          ? [...arr, ...resolveSymbol(resolveImportSpecifierSymbol(d as ts.ImportSpecifier, checker))]
+          : [...arr, d], <ts.Node[]>[]);
+    }
+    return [];
   }
 
-  return identifier;
+  return resolveSymbol(checker.getSymbolAtLocation(identifier)) || [identifier];
 }
 
 function getNgModuleFromObjectLiteral(obj: ts.ObjectLiteralExpression): {[P in keyof NgModule]: ts.Expression} {
@@ -193,33 +211,6 @@ function extractExpressionChildren(expr: ts.Expression): ts.Node[] {
   if (expr.kind === ts.SyntaxKind.ArrayLiteralExpression) {
     return (<ts.ArrayLiteralExpression>expr).elements;
   }
-  return [];
-}
-
-function resolveSpreadExpr(spreadElem: ts.SpreadElement, checker: ts.TypeChecker, program: ts.Program): ts.Node[] {
-  const symbol = checker.getSymbolAtLocation(spreadElem.expression);
-
-  if (!symbol || !symbol.declarations) {
-    throw Error('Failed to get symbol declarations of import identifier');
-  }
-
-  const importSpecifier = symbol.declarations[0] as ts.ImportSpecifier;
-  const identifiers = (<any>importSpecifier.getSourceFile())['identifiers'] as Map<string, string>;
-
-  let found = false, path = '';
-  identifiers.forEach(key => {
-    if (found) {
-      found = false;
-      path = key;
-    }
-    if (key === importSpecifier.name.getText()) {
-      found = true;
-    }
-  });
-
-  const file = program.getSourceFile(path);
-  console.log(file);
-
   return [];
 }
 
@@ -333,14 +324,21 @@ function getLazyInfoFromStr(str: string) {
 }
 
 function getIdentifierDeclaration(node: ts.Identifier, checker: ts.TypeChecker): ts.Declaration {
-  const symbol = checker.getSymbolAtLocation(node);
-  const declaration = symbol.valueDeclaration;
+  return resolveSymbol(checker.getSymbolAtLocation(node));
 
-  if (!declaration) {
-    throw Error(`Identifier '${node.getText()}' has no value declaration`);
+  function resolveSymbol(symbol: ts.Symbol): ts.Declaration {
+    const declaration = symbol.valueDeclaration;
+
+    if (!declaration) {
+      throw Error(`Identifier '${node.getText()}' has no value declaration`);
+    }
+
+    if (declaration.kind === ts.SyntaxKind.ImportSpecifier) {
+      return resolveSymbol(resolveImportSpecifierSymbol(declaration as ts.ImportSpecifier, checker));
+    }
+
+    return declaration;
   }
-
-  return declaration;
 }
 
 function getVariableValue(variable: ts.VariableDeclaration): ts.Expression {
@@ -358,4 +356,33 @@ function getIdentifierAsVariable(node: ts.Identifier, checker: ts.TypeChecker): 
   }
 
   return getVariableValue(declaration as ts.VariableDeclaration);
+}
+
+function resolveImportSpecifierSymbol(importSpecifier: ts.ImportSpecifier, checker: ts.TypeChecker): ts.Symbol {
+  const namedImports = importSpecifier.parent;
+
+  if (!namedImports || namedImports.kind !== ts.SyntaxKind.NamedImports) {
+    throw Error(`Named imports are only supported (import '${importSpecifier.name.getText()}')`);
+  }
+
+  const importClause = namedImports.parent;
+
+  if (!importClause || importClause.kind !== ts.SyntaxKind.ImportClause) {
+    throw Error(`Failed to get import clause of '${importSpecifier.name.getText()}'`);
+  }
+
+  const importDeclaration = importClause.parent;
+
+  if (!importDeclaration || importDeclaration.kind !== ts.SyntaxKind.ImportDeclaration) {
+    throw Error(`Failed to get import declaration of '${importSpecifier.name.getText()}'`);
+  }
+
+  const moduleSymbol = checker.getSymbolAtLocation(importDeclaration.moduleSpecifier);
+  const symbol = checker.tryGetMemberInModuleExports(importSpecifier.name.getText(), moduleSymbol);
+
+  if (!symbol) {
+    throw Error(`Failed to get exported member '${importSpecifier.name.getText()}' from '${importDeclaration.moduleSpecifier.getText()}'`);
+  }
+
+  return symbol;
 }
