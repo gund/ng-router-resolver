@@ -16,6 +16,6 @@
     ]
   },
   "files": [
-    "src/resolver.ts"
+    "src/index.ts"
   ]
 }

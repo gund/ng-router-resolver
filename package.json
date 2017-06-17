@@ -2,15 +2,19 @@
   "name": "ng-router-resolver",
   "version": "0.0.1",
   "description": "Resolve routes from Angular Module",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
+    "prebuild": "rimraf dist",
     "build": "tsc",
     "build:watch": "tsc -w",
-    "prestart": "npm run build",
-    "start": "node dist/resolver.js",
-    "start:watch": "nodemon dist/resolver.js",
-    "prewatch": "npm run build",
-    "watch": "npm-run-all -p build:watch start:watch",
+    "prebuild:test": "rimraf dist",
+    "build:test": "tsc -p tsconfig.test.json",
+    "build:test:watch": "tsc -p tsconfig.test.json -w",
+    "prestart": "npm run build:test",
+    "start": "node dist/test/test.js",
+    "start:watch": "nodemon dist/test/test.js",
+    "prewatch": "npm run build:test",
+    "watch": "npm-run-all -p build:test:watch start:watch",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -38,6 +42,7 @@
     "@types/node": "^7.0.31",
     "nodemon": "^1.11.0",
     "npm-run-all": "^4.0.2",
+    "rimraf": "^2.6.1",
     "rxjs": "^6.0.0-alpha.0"
   }
 }
