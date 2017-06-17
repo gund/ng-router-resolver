@@ -78,7 +78,7 @@ function getRoutesFromFile(fileName: string, moduleName?: string): Route[] {
     return [];
   }
 
-  let imports = extractExpressionChildren(ngModule.imports);
+  let imports = resolveAsIdentifier(extractExpressionChildren, ngModule.imports, checker);
 
   if (imports.length === 0) {
     console.log('No imports are found in NgModule. Only array literals are supported in NgModule.import');
@@ -109,9 +109,7 @@ function getRoutesFromFile(fileName: string, moduleName?: string): Route[] {
     throw Error('More than 1 imports of routes found. Consider merging all routes in one RouterModule import');
   }
 
-  const routes = resolveRoutesFromCall(routerCalls[0], fileName);
-
-  // Resolve lazy routes here
+  const routes = resolveRoutesFromCall(routerCalls[0], fileName, checker);
 
   return routes;
 }
@@ -171,11 +169,18 @@ function getNgModuleFromObjectLiteral(obj: ts.ObjectLiteralExpression): {[P in k
   return ngModule;
 }
 
+function resolveAsIdentifier<T>(resFn: (node: ts.Node) => T, node: ts.Node, checker: ts.TypeChecker): T {
+  if (node.kind === ts.SyntaxKind.Identifier) {
+    return resolveAsIdentifier(resFn, getIdentifierDeclaration(node as ts.Identifier, checker), checker);
+  } else {
+    return resFn(node);
+  }
+}
+
 function extractExpressionChildren(expr: ts.Expression): ts.Node[] {
   if (expr.kind === ts.SyntaxKind.ArrayLiteralExpression) {
     return (<ts.ArrayLiteralExpression>expr).elements;
   }
-
   return [];
 }
 
@@ -219,25 +224,46 @@ function isRouterExpression(expr: ts.CallExpression): boolean {
   return false;
 }
 
-function resolveRoutesFromCall(call: ts.CallExpression, currentFile: string): Route[] {
+function resolveRoutesFromCall(call: ts.CallExpression, currentFile: string, checker: ts.TypeChecker): Route[] {
   if (call.arguments.length === 0) {
     throw Error(`No configuration was provided to '${call.expression.getText()}'`);
   }
 
-  const config = call.arguments[0] as ts.ArrayLiteralExpression;
+  let config = call.arguments[0];
+
+  if (config.kind === ts.SyntaxKind.Identifier) {
+    config = getIdentifierAsVariable(config as ts.Identifier, checker);
+  }
 
   if (config.kind !== ts.SyntaxKind.ArrayLiteralExpression) {
     throw Error('Only array literals supported in router config');
   }
 
-  return getRoutesFromArray(config, currentFile);
+  return getRoutesFromArray(config as ts.ArrayLiteralExpression, currentFile, checker);
 }
 
-function getRoutesFromArray(array: ts.ArrayLiteralExpression, currentFile: string): Route[] {
-  const confObjects = array.elements.filter(isNodeObjectLiteralExpression) as ts.ObjectLiteralExpression[];
+function getRoutesFromArray(array: ts.ArrayLiteralExpression, currentFile: string, checker: ts.TypeChecker): Route[] {
+  const confObjects = array.elements
+    .reduce((arr, n) => {
+      if (n.kind === ts.SyntaxKind.SpreadElement) {
+        let expr = (<ts.SpreadElement>n).expression;
+        if (expr.kind === ts.SyntaxKind.Identifier) {
+          expr = resolveAsIdentifier(getVariableValue, expr, checker);
+        }
+
+        let newArray: ts.Expression[] = [];
+        if (expr.kind === ts.SyntaxKind.ArrayLiteralExpression) {
+          newArray = (<ts.ArrayLiteralExpression>expr).elements;
+        }
+
+        return [...arr, ...newArray];
+      }
+      return [...arr, n];
+    }, <ts.Expression[]>[])
+    .filter(isNodeObjectLiteralExpression) as ts.ObjectLiteralExpression[];
 
   if (confObjects.length === 0) {
-    throw Error('No routes found in NgModule. Only object literals are supported');
+    throw Error('No routes found in NgModule');
   }
 
   const routes: Route[] = [];
@@ -249,7 +275,7 @@ function getRoutesFromArray(array: ts.ArrayLiteralExpression, currentFile: strin
       .filter(isNodePropertyAssignment)
       .forEach((p: ts.PropertyAssignment) => {
         const name = p.name.getText();
-        route[name] = getRouteValue(name, p.initializer, currentFile);
+        route[name] = getRouteValue(name, p.initializer, currentFile, checker);
       });
 
     routes.push(route);
@@ -258,13 +284,13 @@ function getRoutesFromArray(array: ts.ArrayLiteralExpression, currentFile: strin
   return routes;
 }
 
-function getRouteValue(name: string, expr: ts.Node, currentFile: string): any {
+function getRouteValue(name: string, expr: ts.Node, currentFile: string, checker: ts.TypeChecker): any {
   switch (name) {
     case 'children': {
       if (expr.kind !== ts.SyntaxKind.ArrayLiteralExpression) {
         throw Error('Only array literals are supported for child routes');
       }
-      return getRoutesFromArray(expr as ts.ArrayLiteralExpression, currentFile);
+      return getRoutesFromArray(expr as ts.ArrayLiteralExpression, currentFile, checker);
     }
     case 'loadChildren': {
       const { path, moduleName } = getLazyInfoFromStr(getAsString(expr));
@@ -294,6 +320,30 @@ function getLazyInfoFromStr(str: string) {
   return { path, moduleName };
 }
 
-function getIdentifierValue(node: ts.Identifier): ts.Node | undefined {
-  return undefined;
+function getIdentifierDeclaration(node: ts.Identifier, checker: ts.TypeChecker): ts.Declaration {
+  const symbol = checker.getSymbolAtLocation(node);
+  const declaration = symbol.valueDeclaration;
+
+  if (!declaration) {
+    throw Error(`Identifier '${node.getText()}' has no value declaration`);
+  }
+
+  return declaration;
+}
+
+function getVariableValue(variable: ts.VariableDeclaration): ts.Expression {
+  if (!variable.initializer) {
+    throw Error(`Variable '${variable.name.getText()}' does not have initial value`);
+  }
+  return variable.initializer;
+}
+
+function getIdentifierAsVariable(node: ts.Identifier, checker: ts.TypeChecker): ts.Expression {
+  const declaration = getIdentifierDeclaration(node, checker);
+
+  if (declaration.kind !== ts.SyntaxKind.VariableDeclaration) {
+    throw Error(`Expected '${node.getText()}' to be variable but got ${ts.SyntaxKind[declaration.kind]}`);
+  }
+
+  return getVariableValue(declaration as ts.VariableDeclaration);
 }
