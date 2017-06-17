@@ -85,14 +85,15 @@ function getRoutesFromFile(fileName: string, moduleName?: string): Route[] {
     return [];
   }
 
-  // const spreadImports = imports.filter(isNodeSpreadElement)
-  //   .reduce<ts.Node[]>((arr, i) => [...arr, ...resolveSpreadExpr(i as ts.SpreadElement, checker, program)], []);
-  const spreadImports: ts.Node[] = [];
-
-  imports = [...imports, ...spreadImports].filter(n => /*isNodeIdentifier(n) || */isNodeCallExpression(n));
-
   // Resolve here all Identifiers to it's root declarations
-  const callExprs = imports as ts.CallExpression[];
+  const callExprs = imports
+    .map(n => {
+      if (n.kind === ts.SyntaxKind.Identifier) {
+        return resolveImportIdentifier(n as ts.Identifier, checker);
+      }
+      return n;
+    })
+    .filter(isNodeCallExpression) as ts.CallExpression[];
 
   if (callExprs.length === 0) {
     console.log(`No calls are found in NgModule. Routes are always calls like '${ROUTES_EXPRS_TXT[0]}(...)'`);
@@ -153,6 +154,17 @@ function getNgModuleFromDecorator(decorator: ts.Decorator): {[P in keyof NgModul
   }
 
   throw Error('Only object literals supported in @NgModule for now');
+}
+
+function resolveImportIdentifier(identifier: ts.Identifier, checker: ts.TypeChecker): ts.Node {
+  const symbol = checker.getSymbolAtLocation(identifier);
+  const decl = symbol.valueDeclaration;
+
+  if (decl && decl.kind === ts.SyntaxKind.VariableDeclaration) {
+    return getVariableValue(decl as ts.VariableDeclaration);
+  }
+
+  return identifier;
 }
 
 function getNgModuleFromObjectLiteral(obj: ts.ObjectLiteralExpression): {[P in keyof NgModule]: ts.Expression} {
