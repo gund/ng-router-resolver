@@ -1,14 +1,18 @@
 # ng-router-resolver
 
-> Resolve routes from Angular Module
-
-_Now in POC stage, PRs are welcome!_
+> Resolve routes from Angular Module statically
 
 This project is aimed to be used as a cli/programmatic tool with Angular projects
 to statically analyze routes in `NgModules` and do some useful stuff with it.
 
 As a use case you might want to generate some rules for ServiceWorker based on routes
 to add some offline/cache capabilities to any Angular application.
+
+## Installation
+
+```bash
+$ npm install --save-dev ng-router-resolver
+```
 
 ## Usage
 
