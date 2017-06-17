@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "description": "Resolve routes from Angular Module",
   "main": "dist/index.js",
+  "typings": "dist/index.d.ts",
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "tsc",
