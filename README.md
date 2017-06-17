@@ -16,8 +16,6 @@ Currently it is in POC stage.
 
 It parses given Angular TS module and collects all routes.
 
-The limitation is that it cannot yet resolve routes from variables only from literals.
-
 ## Next Steps
 
 - ~~Collect children routes~~ [DONE]
