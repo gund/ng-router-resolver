@@ -8,9 +8,7 @@ const SOME_ROUTES = [
 const ROUTES = [
   { path: '', component: undefined },
   {
-    path: 'child', component: undefined, children: [
-      { path: 'sub-child', component: undefined }
-    ]
+    path: 'child', component: undefined, children: SOME_ROUTES
   },
   ...SOME_ROUTES,
 ];

@@ -229,6 +229,9 @@ export class NgRouterResolver {
   private getRouteValue(name: string, expr: ts.Node): any {
     switch (name) {
       case 'children': {
+        if (expr.kind === ts.SyntaxKind.Identifier) {
+          expr = resolveAsIdentifier(getVariableValue, expr, this.checker);
+        }
         if (expr.kind !== ts.SyntaxKind.ArrayLiteralExpression) {
           throw Error('Only array literals are supported for child routes');
         }
