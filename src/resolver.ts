@@ -3,6 +3,7 @@ import { dirname, join } from 'path';
 import * as ts from 'typescript';
 
 import {
+  extractExpressionChildren,
   extractIdentifierExpressionChildren,
   getAsString,
   getIdentifierAsVariable,
@@ -66,7 +67,7 @@ export class NgRouterResolver {
     }
   }
 
-  private getNgModuleClass(moduleName?: string): ts.ClassDeclaration {
+  private getNgModuleClass(moduleName: string = ''): ts.ClassDeclaration {
     const sourceFile = this.program.getSourceFile(this.fileName);
 
     if (!sourceFile) {
@@ -76,28 +77,25 @@ export class NgRouterResolver {
     const classes = sourceFile.statements.filter(n => isNodeClassDeclaration(n) && isNodeExported(n)) as ts.ClassDeclaration[];
 
     if (classes.length === 0) {
-      throw Error('No exported classes found');
+      throw Error(`No exported classes found in '${this.fileName}'`);
     }
 
     const isDecoratorNgModule = isDecoratorOfType('NgModule');
-    const ngModules = classes.filter(e => e.decorators && e.decorators.some(isDecoratorNgModule));
+    let ngModules = classes.filter(cls => cls.decorators && cls.decorators.some(isDecoratorNgModule));
+
+    if (moduleName) {
+      ngModules = ngModules.filter(cls => cls.name && cls.name.getText() === moduleName);
+    }
 
     if (ngModules.length === 0) {
-      throw Error('No exported NgModule class found');
+      throw Error(`No exported NgModule ${moduleName} class found in '${this.fileName}'`);
     }
 
     if (ngModules.length > 1) {
-      throw Error('More than 1 NgModule exported found');
+      throw Error(`More than 1 NgModule exported found in '${this.fileName}'`);
     }
 
     const ngModuleClass = ngModules[0];
-
-    // Check if NgModule is same as expected by moduleName
-    if (moduleName) {
-      if (!ngModuleClass.name || ngModuleClass.name.getText() !== moduleName) {
-        throw Error(`NgModule with name '${moduleName}' was expected in ${this.fileName}`);
-      }
-    }
 
     if (ngModuleClass.name) {
       this.ngModuleName = ngModuleClass.name.getText();
@@ -146,7 +144,13 @@ export class NgRouterResolver {
 
       if (valDeclaration) {
         if (valDeclaration.kind === ts.SyntaxKind.VariableDeclaration) {
-          return [getVariableValue(valDeclaration as ts.VariableDeclaration)];
+          const val = getVariableValue(valDeclaration as ts.VariableDeclaration);
+
+          if (val.kind === ts.SyntaxKind.ArrayLiteralExpression) {
+            return extractExpressionChildren(val as ts.ArrayLiteralExpression);
+          }
+
+          return [val];
         }
         if (valDeclaration.kind === ts.SyntaxKind.ClassDeclaration) {
           return this.getCallsFromClass(valDeclaration as ts.ClassDeclaration);

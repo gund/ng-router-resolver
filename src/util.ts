@@ -104,7 +104,7 @@ export function getIdentifierDeclaration(node: ts.Identifier, checker: ts.TypeCh
   return resolveSymbol(checker.getSymbolAtLocation(node));
 
   function resolveSymbol(symbol: ts.Symbol): ts.Declaration {
-    const declaration = symbol.valueDeclaration;
+    const declaration = symbol.valueDeclaration || symbol.declarations && symbol.declarations[0];
 
     if (!declaration) {
       throw Error(`Identifier '${node.getText()}' has no value declaration`);
