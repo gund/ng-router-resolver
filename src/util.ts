@@ -111,14 +111,20 @@ export function getIdentifierDeclaration(node: ts.Identifier, checker: ts.TypeCh
     }
 
     if (declaration.kind === ts.SyntaxKind.ImportSpecifier) {
-      return resolveSymbol(resolveImportSpecifierSymbol(declaration as ts.ImportSpecifier, checker));
+      const symbol = resolveImportSpecifierSymbol(declaration as ts.ImportSpecifier, checker);
+
+      if (!symbol) {
+        throw Error(`Identifier '${node.getText()}' is resolved from external module`);
+      }
+
+      return resolveSymbol(symbol);
     }
 
     return declaration;
   }
 }
 
-export function resolveImportSpecifierSymbol(importSpecifier: ts.ImportSpecifier, checker: ts.TypeChecker): ts.Symbol {
+export function resolveImportSpecifierSymbol(importSpecifier: ts.ImportSpecifier, checker: ts.TypeChecker): ts.Symbol | undefined {
   const namedImports = importSpecifier.parent;
 
   if (!namedImports || namedImports.kind !== ts.SyntaxKind.NamedImports) {
@@ -138,6 +144,11 @@ export function resolveImportSpecifierSymbol(importSpecifier: ts.ImportSpecifier
   }
 
   const moduleSymbol = checker.getSymbolAtLocation(importDeclaration.moduleSpecifier);
+
+  if (!moduleSymbol) {
+    return undefined;
+  }
+
   const symbol = checker.tryGetMemberInModuleExports(importSpecifier.name.getText(), moduleSymbol);
 
   if (!symbol) {

@@ -156,7 +156,7 @@ export class NgRouterResolver {
       if (declarations) {
         return declarations
           .reduce((arr, d) => d.kind === ts.SyntaxKind.ImportSpecifier
-            ? [...arr, ...resolveSymbol(resolveImportSpecifierSymbol(d as ts.ImportSpecifier, this.checker))]
+            ? [...arr, ...resolveSymbol(resolveImportSpecifierSymbol(d as ts.ImportSpecifier, this.checker) || d as any)]
             : [...arr, d], <ts.Node[]>[]);
       }
 
