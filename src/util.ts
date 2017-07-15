@@ -103,7 +103,11 @@ export function extractIdentifierExpressionChildren(expr: ts.Node, checker: ts.T
 export function getIdentifierDeclaration(node: ts.Identifier, checker: ts.TypeChecker): ts.Declaration {
   return resolveSymbol(checker.getSymbolAtLocation(node));
 
-  function resolveSymbol(symbol: ts.Symbol): ts.Declaration {
+  function resolveSymbol(symbol: ts.Symbol | undefined): ts.Declaration {
+    if (!symbol) {
+      throw Error(`Identifier '${node.getText()}' has no symbol to resolve`);
+    }
+
     const declaration = symbol.valueDeclaration || symbol.declarations && symbol.declarations[0];
 
     if (!declaration) {

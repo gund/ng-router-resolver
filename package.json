@@ -1,13 +1,17 @@
 {
   "name": "ng-router-resolver",
-  "version": "0.0.4",
+  "version": "0.1.0",
   "description": "Resolve routes from Angular Module",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
+  "bin": {
+    "ng-router-resolver": "bin/ng-router-resolver.js"
+  },
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "tsc",
     "build:watch": "tsc -w",
+    "cli": "node dist/bin/ng-router-resolver.js",
     "prebuild:test": "rimraf dist",
     "build:test": "tsc -p tsconfig.test.json",
     "build:test:watch": "tsc -p tsconfig.test.json -w",
@@ -24,6 +28,7 @@
     "type": "git",
     "url": "https://github.com/gund/ng-router-resolver.git"
   },
+  "homepage": "https://github.com/gund/ng-router-resolver",
   "keywords": [
     "anguar",
     "angular2",
@@ -38,10 +43,12 @@
   "dependencies": {
     "@angular/core": "^4.2.2",
     "@angular/router": "^4.2.2",
+    "minimist": "^1.2.0",
     "typescript": "^2.3.4"
   },
   "devDependencies": {
     "@types/core-js": "^0.9.41",
+    "@types/minimist": "^1.2.0",
     "@types/node": "^7.0.31",
     "copyfiles": "^1.2.0",
     "nodemon": "^1.11.0",

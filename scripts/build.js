@@ -13,8 +13,14 @@ console.log('package.json was written to dist');
 copyfiles([
   'LICENCE',
   'README.md',
+  'src/bin/help.md',
   'dist' // Destination folder
 ], {}, () => null);
+
+copyfiles([
+  'src/bin/help.md',
+  'dist' // Destination folder
+], { '--up': 1, up: 1 }, () => null);
 console.log('Additional files were copied to dist');
 
 function fixDistPath(path) {

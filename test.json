@@ -1,0 +1,36 @@
+[
+  {
+    "path": "",
+    "component": "undefined",
+    "pathMatch": "full",
+    "children": [
+      {
+        "path": "child",
+        "component": "undefined"
+      }
+    ]
+  },
+  {
+    "path": "lazy",
+    "loadChildren": [
+      {
+        "path": "",
+        "component": "undefined"
+      },
+      {
+        "path": "child",
+        "component": "undefined",
+        "children": [
+          {
+            "path": "external",
+            "component": "undefined"
+          }
+        ]
+      },
+      {
+        "path": "external",
+        "component": "undefined"
+      }
+    ]
+  }
+]

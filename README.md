@@ -32,10 +32,6 @@ It will return an array of type same as `Route` from `@angular/route` package.
 
 ### CLI
 
-**TBD**
-
-Syntax will be something like this:
-
 ```bash
 $ ng-router-resolver src/app/app.module.ts                    // Prints json into stdout
 $ ng-router-resolver src/app/app.module.ts --out routes.json  // Prints json into specified file
@@ -49,7 +45,7 @@ $ ng-router-resolver src/app/app.module.ts --out routes.json  // Prints json int
 - ~~Support Spread operators in routes configuration~~ [DONE]
 - ~~Collect routes from other impoted modules~~ [DONE]
 - ~~Organize internal code structure to transition from POC to some stable version~~ [DONE]
-- Create a CLI for resolving routes and dumping them as JSON structure into file
+- ~~Create a CLI for resolving routes and dumping them as JSON structure into file~~ [DONE]
 - Add unit tests with coverage at least 75%
 - Integrate with TravisCI and Codecov
 - Integrate semantic-release to enable CD
