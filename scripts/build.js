@@ -13,7 +13,6 @@ console.log('package.json was written to dist');
 copyfiles([
   'LICENCE',
   'README.md',
-  'src/bin/help.md',
   'dist' // Destination folder
 ], {}, () => null);
 
