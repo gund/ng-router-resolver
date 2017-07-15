@@ -138,7 +138,11 @@ export class NgRouterResolver {
   }
 
   private resolveImportIdentifier(identifier: ts.Identifier): ts.Node[] {
-    const resolveSymbol = (symbol: ts.Symbol): ts.Node[] => {
+    const resolveSymbol = (symbol: ts.Symbol | undefined): ts.Node[] => {
+      if (!symbol) {
+        return [];
+      }
+
       const valDeclaration = symbol.valueDeclaration;
       const declarations = symbol.declarations;
 
