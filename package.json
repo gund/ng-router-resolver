@@ -38,10 +38,12 @@
   "dependencies": {
     "@angular/core": "^4.2.2",
     "@angular/router": "^4.2.2",
+    "minimist": "^1.2.0",
     "typescript": "^2.3.4"
   },
   "devDependencies": {
     "@types/core-js": "^0.9.41",
+    "@types/minimist": "^1.2.0",
     "@types/node": "^7.0.31",
     "copyfiles": "^1.2.0",
     "nodemon": "^1.11.0",
