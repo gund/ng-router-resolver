@@ -236,6 +236,12 @@ export class NgRouterResolver {
 
   private getRouteValue(name: string, expr: ts.Node): any {
     switch (name) {
+      // TODO: could potentially use this same logic for other route info
+      case 'data': {
+        let data;
+        eval('data = ' + getAsString(expr));
+        return JSON.parse(JSON.stringify(data));
+      }
       case 'children': {
         if (expr.kind === ts.SyntaxKind.Identifier) {
           expr = resolveAsIdentifier(getVariableValue, expr, this.checker);
